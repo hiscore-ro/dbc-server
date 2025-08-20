@@ -31,6 +31,18 @@ dbc-server/
 
 ## Tools
 
+### dbview
+Linux CLI tool for viewing DBF files directly. Useful for verifying API data accuracy:
+```bash
+# View first records
+dbview tmp/STOC.DBF | head -20
+
+# Find specific record by code
+dbview tmp/STOC.DBF | grep -A 20 "Cod        : 50479"
+
+# The API data has been verified to match dbview output exactly
+```
+
 ### extract-schema
 Extracts schema from DBF files and generates SQL CREATE TABLE statements.
 
@@ -334,3 +346,11 @@ The API returns JSON with English field names while the DBF files contain Romani
 - Romanian: CANTITATE → English: quantity
 - Romanian: PRET → English: price
 - And 38 more field mappings...
+
+## Data Verification
+
+The API has been tested and verified against the `dbview` CLI tool to ensure accurate data reading:
+- All field values match exactly between dbview output and API responses
+- Numeric precision is preserved (prices, quantities)
+- Empty fields are correctly handled as empty strings or nulls
+- Romanian characters in field names are properly mapped to English
