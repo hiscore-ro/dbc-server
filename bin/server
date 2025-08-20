@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Set the script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+# Change to project root
+cd "$PROJECT_ROOT"
+
+# Load environment variables from .env file if it exists
+if [ -f ".env" ]; then
+    echo "Loading environment variables from .env file..."
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
+# Set default values if not provided
+export DBF_PATH="${DBF_PATH:-tmp}"
+export ASPNETCORE_URLS="${ASPNETCORE_URLS:-http://localhost:3000}"
+export ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Development}"
+
+# Extract port from ASPNETCORE_URLS
+PORT=$(echo "$ASPNETCORE_URLS" | grep -oE '[0-9]+$')
+PORT="${PORT:-3000}"
+
+# Check if server is already running on the port
+echo "Checking for existing server on port $PORT..."
+EXISTING_PID=$(lsof -ti:$PORT 2>/dev/null)
+
+if [ -n "$EXISTING_PID" ]; then
+    echo "Found existing server process (PID: $EXISTING_PID) on port $PORT"
+    echo "Stopping existing server..."
+    kill $EXISTING_PID 2>/dev/null
+    
+    # Wait for process to stop
+    sleep 2
+    
+    # Force kill if still running
+    if kill -0 $EXISTING_PID 2>/dev/null; then
+        echo "Force stopping server..."
+        kill -9 $EXISTING_PID 2>/dev/null
+        sleep 1
+    fi
+    
+    echo "Existing server stopped."
+fi
+
+# Display configuration
+echo "========================================="
+echo "DBC Server Starting..."
+echo "========================================="
+echo "DBF Path: $DBF_PATH"
+echo "URLs: $ASPNETCORE_URLS"
+echo "Environment: $ASPNETCORE_ENVIRONMENT"
+echo "========================================="
+
+# Check if DBF directory exists
+if [ ! -d "$DBF_PATH" ]; then
+    echo "Warning: DBF directory '$DBF_PATH' does not exist. Creating it..."
+    mkdir -p "$DBF_PATH"
+fi
+
+# Check for .DBF files
+DBF_COUNT=$(find "$DBF_PATH" -name "*.DBF" 2>/dev/null | wc -l)
+if [ "$DBF_COUNT" -eq 0 ]; then
+    echo "Warning: No .DBF files found in '$DBF_PATH'"
+fi
+
+# Build the project if needed
+echo "Building the project..."
+dotnet build src/DbcServer.Api/DbcServer.Api.csproj -c Release --nologo -v q
+
+if [ $? -ne 0 ]; then
+    echo "Build failed. Please fix the errors and try again."
+    exit 1
+fi
+
+# Run the server
+echo "Starting the server..."
+exec dotnet run --project src/DbcServer.Api/DbcServer.Api.csproj -c Release --no-build
