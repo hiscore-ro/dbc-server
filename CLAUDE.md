@@ -6,6 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 dbc-server is a high-performance, cross-platform C# server that exposes dBase database (.DBF) files through a RESTful API with Windows installer and auto-update support. The server works on both Linux and Windows, providing read access to dBase data files. It successfully handles large DBF files (100+ MB with 239,000+ records) with multiple layers of caching, efficient pagination, and background cache refresh for optimal performance.
 
+### Key Features
+- **Windows Installer**: Squirrel.Windows-based Setup.exe with auto-update support
+- **Cross-Platform**: Runs on Windows, Linux, and macOS
+- **High Performance**: Smart caching with 15-minute TTL and background refresh
+- **Flexible Config**: Supports both config.json (Windows) and environment variables (Linux/Dev)
+- **Verified Accuracy**: API data tested against dbview CLI tool
+
 ## Project Structure
 
 ```
@@ -62,6 +69,38 @@ bin/extract-schema data/*.DBF
 
 The tool reads DBF header information and MDX index files (if present) to generate a complete SQL schema including field types and indexes. Default output is `config/schema.sql`.
 
+## CI/CD Workflows
+
+### GitHub Actions
+The project uses GitHub Actions for continuous integration and deployment:
+
+1. **CI/CD Pipeline** (`.github/workflows/ci.yml`)
+   - Tests on Ubuntu and Windows
+   - Builds and verifies code quality
+   - Publishes Windows binaries
+   - Runs on push to main and PRs
+
+2. **Windows Release** (`.github/workflows/windows-release.yml`)
+   - Creates Squirrel.Windows installer
+   - Triggered on version tags (e.g., `v1.0.0`)
+   - Downloads Squirrel.exe from official releases
+   - Creates NuGet package and runs releasify
+   - Publishes Setup.exe with auto-update support
+   - Uploads to GitHub Releases
+
+### Creating a Release
+```bash
+# Tag a version
+git tag v1.0.0
+git push --tags
+
+# This triggers the Windows Release workflow which:
+# 1. Builds the application
+# 2. Creates NuGet package
+# 3. Runs Squirrel releasify
+# 4. Publishes Setup.exe to GitHub Releases
+```
+
 ## Development Commands
 
 ### Initial Setup
@@ -94,6 +133,12 @@ dotnet build -c Release
 
 # Clean and rebuild
 dotnet clean && dotnet build
+
+# Format code (auto-fix)
+dotnet format
+
+# Format check (CI validation)
+dotnet format --verify-no-changes
 ```
 
 ### Run Commands
@@ -195,7 +240,7 @@ dotnet list package --outdated
 <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.8" />
 
 <!-- For Windows installer and auto-updates -->
-<PackageReference Include="Squirrel.Windows" Version="2.0.1" />
+<PackageReference Include="Squirrel.Windows" Version="2.0.1" /> <!-- Used for auto-update functionality -->
 
 <!-- For environment variables -->
 <PackageReference Include="DotNetEnv" Version="3.1.1" />
@@ -354,3 +399,26 @@ The API has been tested and verified against the `dbview` CLI tool to ensure acc
 - Numeric precision is preserved (prices, quantities)
 - Empty fields are correctly handled as empty strings or nulls
 - Romanian characters in field names are properly mapped to English
+
+### Verification Example
+```bash
+# Using dbview
+dbview tmp/STOC.DBF | grep "Cod        : 50479"
+# Output: Denumire   : BEC, Pret       : 0.3361
+
+# Using API
+curl http://localhost:3000/api/stock/50479
+# Output: {"name":"BEC","price":0.3361,...}
+
+# Values match exactly ✓
+```
+
+## Troubleshooting
+
+### Windows Installer Issues
+- If Squirrel.Windows dotnet tool fails: The workflow downloads Squirrel.exe directly from GitHub releases
+- Missing icon.ico: The workflow handles this gracefully and continues without icon
+
+### CI/CD Issues
+- Format check failures: Run `dotnet format` locally before pushing
+- Build warnings: The CI uses `/p:TreatWarningsAsErrors=false` to allow warnings
