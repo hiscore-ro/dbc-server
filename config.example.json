@@ -1,0 +1,12 @@
+{
+  "dbfPath": "tmp",
+  "serverUrl": "http://localhost:3000",
+  "environment": "Production",
+  "cacheTtlMinutes": 15,
+  "maxSearchResults": 100,
+  "updateSettings": {
+    "enableAutoUpdate": true,
+    "checkIntervalMinutes": 60,
+    "updateUrl": "https://github.com/yourusername/dbc-server"
+  }
+}

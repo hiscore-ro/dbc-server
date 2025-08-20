@@ -1,0 +1,171 @@
+name: Windows Release
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Get version from tag or generate
+      id: version
+      shell: pwsh
+      run: |
+        if ($env:GITHUB_REF -match 'refs/tags/v(.+)') {
+          $version = $matches[1]
+        } else {
+          $version = "1.0.$env:GITHUB_RUN_NUMBER"
+        }
+        echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+        echo "Version: $version"
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build
+      run: dotnet publish src/DbcServer.Api/DbcServer.Api.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:Version=${{ steps.version.outputs.VERSION }} -o ./publish
+    
+    - name: Install Squirrel tools
+      run: dotnet tool install -g squirrel.windows
+    
+    - name: Create NuGet package
+      shell: pwsh
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}"
+        
+        # Create nuspec file
+        @"
+        <?xml version="1.0"?>
+        <package>
+          <metadata>
+            <id>DbcServer</id>
+            <version>$version</version>
+            <authors>Your Name</authors>
+            <description>DBC Server - DBF file API server</description>
+            <requireLicenseAcceptance>false</requireLicenseAcceptance>
+          </metadata>
+          <files>
+            <file src="publish\**\*.*" target="lib\net45\" />
+          </files>
+        </package>
+        "@ | Out-File -FilePath DbcServer.nuspec -Encoding UTF8
+        
+        # Create the nupkg
+        nuget pack DbcServer.nuspec -Version $version -OutputDirectory ./nupkg
+    
+    - name: Create Squirrel installer
+      shell: pwsh
+      run: |
+        $version = "${{ steps.version.outputs.VERSION }}"
+        
+        # Create Releases directory
+        New-Item -ItemType Directory -Force -Path ./Releases
+        
+        # Run Squirrel to create installer
+        squirrel --releasify "./nupkg/DbcServer.$version.nupkg" --releaseDir ./Releases --setupIcon ./icon.ico --no-msi
+    
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./Releases/Setup.exe
+          ./Releases/DbcServer-${{ steps.version.outputs.VERSION }}-full.nupkg
+          ./Releases/RELEASES
+        body: |
+          ## DbcServer v${{ steps.version.outputs.VERSION }}
+          
+          ### Installation
+          - Download and run `Setup.exe`
+          - The application will auto-update when new versions are available
+          
+          ### Configuration
+          Edit `config.json` in the installation directory to configure:
+          - DBF file path
+          - Server URL and port
+          - Auto-update settings
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload artifacts
+      if: "!startsWith(github.ref, 'refs/tags/')"
+      uses: actions/upload-artifact@v3
+      with:
+        name: windows-installer
+        path: |
+          ./Releases/Setup.exe
+          ./Releases/*.nupkg
+          ./Releases/RELEASES
+  
+  cleanup-old-releases:
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Cleanup old releases
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const releases = await github.rest.repos.listReleases({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 100
+          });
+          
+          // Sort releases by created_at date
+          const sortedReleases = releases.data.sort((a, b) => 
+            new Date(b.created_at) - new Date(a.created_at)
+          );
+          
+          // Keep only the latest 20 releases
+          const releasesToDelete = sortedReleases.slice(20);
+          
+          for (const release of releasesToDelete) {
+            console.log(`Deleting old release: ${release.tag_name}`);
+            
+            // Delete release assets first
+            for (const asset of release.assets) {
+              await github.rest.repos.deleteReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                asset_id: asset.id
+              });
+            }
+            
+            // Delete the release
+            await github.rest.repos.deleteRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id
+            });
+            
+            // Delete the tag
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${release.tag_name}`
+              });
+            } catch (error) {
+              console.log(`Could not delete tag ${release.tag_name}: ${error.message}`);
+            }
+          }
+          
+          console.log(`Kept ${Math.min(20, sortedReleases.length)} most recent releases`);
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

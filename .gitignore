@@ -443,6 +443,10 @@ $RECYCLE.BIN/
 # Application specific
 appsettings.Development.json
 appsettings.Local.json
+config.json
+DbcServer.nuspec
+nupkg/
+Releases/
 
 # Temporary data directory - exclude DBF files but keep directory structure
 tmp/*.DBF
