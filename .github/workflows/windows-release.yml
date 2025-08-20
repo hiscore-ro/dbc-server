@@ -34,11 +34,21 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     
-    - name: Build
+    - name: Build and Publish
       run: dotnet publish src/DbcServer.Api/DbcServer.Api.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:Version=${{ steps.version.outputs.VERSION }} -o ./publish
     
-    - name: Install Squirrel tools
-      run: dotnet tool install -g squirrel.windows
+    - name: Copy config example
+      run: Copy-Item -Path "config.example.json" -Destination "./publish/config.example.json"
+    
+    - name: Download Squirrel tools
+      shell: pwsh
+      run: |
+        # Download Squirrel.Windows package
+        Invoke-WebRequest -Uri "https://github.com/Squirrel/Squirrel.Windows/releases/download/2.0.1/Squirrel.Windows-2.0.1.zip" -OutFile "squirrel.zip"
+        Expand-Archive -Path "squirrel.zip" -DestinationPath "./squirrel-tools" -Force
+        
+        # Add to PATH
+        echo "$PWD\squirrel-tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     
     - name: Create NuGet package
       shell: pwsh
@@ -52,9 +62,11 @@ jobs:
           <metadata>
             <id>DbcServer</id>
             <version>$version</version>
+            <title>DBC Server</title>
             <authors>Vasile Buza</authors>
-            <description>DBC Server - DBF file API server</description>
+            <description>Cross-platform DBF file API server with Windows auto-update support</description>
             <requireLicenseAcceptance>false</requireLicenseAcceptance>
+            <iconUrl>https://raw.githubusercontent.com/hiscore-ro/dbc-server/main/icon.png</iconUrl>
           </metadata>
           <files>
             <file src="publish\**\*.*" target="lib\net45\" />
@@ -73,12 +85,8 @@ jobs:
         # Create Releases directory
         New-Item -ItemType Directory -Force -Path ./Releases
         
-        # Run Squirrel to create installer (skip icon if not exists)
-        if (Test-Path "./icon.ico") {
-          squirrel --releasify "./nupkg/DbcServer.$version.nupkg" --releaseDir ./Releases --setupIcon ./icon.ico --no-msi
-        } else {
-          squirrel --releasify "./nupkg/DbcServer.$version.nupkg" --releaseDir ./Releases --no-msi
-        }
+        # Run Squirrel.exe to create installer
+        & "./squirrel-tools/Squirrel.exe" --releasify "./nupkg/DbcServer.$version.nupkg" --releaseDir ./Releases --no-msi
     
     - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
@@ -114,62 +122,4 @@ jobs:
           ./Releases/Setup.exe
           ./Releases/*.nupkg
           ./Releases/RELEASES
-  
-  cleanup-old-releases:
-    needs: build-and-release
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    
-    steps:
-    - name: Cleanup old releases
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const releases = await github.rest.repos.listReleases({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            per_page: 100
-          });
-          
-          // Sort releases by created_at date
-          const sortedReleases = releases.data.sort((a, b) => 
-            new Date(b.created_at) - new Date(a.created_at)
-          );
-          
-          // Keep only the latest 20 releases
-          const releasesToDelete = sortedReleases.slice(20);
-          
-          for (const release of releasesToDelete) {
-            console.log(`Deleting old release: ${release.tag_name}`);
-            
-            // Delete release assets first
-            for (const asset of release.assets) {
-              await github.rest.repos.deleteReleaseAsset({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                asset_id: asset.id
-              });
-            }
-            
-            // Delete the release
-            await github.rest.repos.deleteRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: release.id
-            });
-            
-            // Delete the tag
-            try {
-              await github.rest.git.deleteRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: `tags/${release.tag_name}`
-              });
-            } catch (error) {
-              console.log(`Could not delete tag ${release.tag_name}: ${error.message}`);
-            }
-          }
-          
-          console.log(`Kept ${Math.min(20, sortedReleases.length)} most recent releases`);
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        retention-days: 30
