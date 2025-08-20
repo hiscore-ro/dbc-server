@@ -25,7 +25,7 @@ public class ConfigurationService : IConfigurationService
         _logger = logger;
         _configFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
         _exampleConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.example.json");
-        
+
         // In production on Windows, create config.json from example if it doesn't exist
         if (OperatingSystem.IsWindows() && !File.Exists(_configFilePath) && File.Exists(_exampleConfigPath))
         {

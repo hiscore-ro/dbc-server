@@ -17,7 +17,7 @@ public class StockService : IStockService
     public async Task<PaginatedResponseDto<StockItemDto>> GetStockItemsAsync(int pageNumber = 1, int pageSize = 10, string? barcode = null)
     {
         var result = await _repository.GetStockItemsAsync(pageNumber, pageSize, barcode);
-        
+
         return new PaginatedResponseDto<StockItemDto>
         {
             Items = result.Items.Select(MapToDto),

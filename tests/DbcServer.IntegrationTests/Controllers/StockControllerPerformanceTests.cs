@@ -48,15 +48,15 @@ public class StockControllerPerformanceTests : IClassFixture<WebApplicationFacto
     {
         // Arrange
         var tasks = new List<Task<HttpResponseMessage>>();
-        
+
         // Act - Send 10 concurrent requests
         for (int i = 1; i <= 10; i++)
         {
             tasks.Add(_client.GetAsync($"/api/stock?pageSize=5&pageNumber={i}"));
         }
-        
+
         var responses = await Task.WhenAll(tasks);
-        
+
         // Assert - All requests should succeed
         foreach (var response in responses)
         {
@@ -70,16 +70,16 @@ public class StockControllerPerformanceTests : IClassFixture<WebApplicationFacto
     {
         // Test various page sizes
         var pageSizes = new[] { 1, 5, 10, 50, 100 };
-        
+
         foreach (var pageSize in pageSizes)
         {
             var response = await _client.GetAsync($"/api/stock?pageSize={pageSize}");
             response.EnsureSuccessStatusCode();
-            
+
             var content = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<PaginatedResponseDto<StockItemDto>>(content, 
+            var result = JsonSerializer.Deserialize<PaginatedResponseDto<StockItemDto>>(content,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            
+
             result.Should().NotBeNull();
             result!.Items.Count().Should().BeInRange(0, pageSize);
             result.PageSize.Should().Be(pageSize);
@@ -91,11 +91,11 @@ public class StockControllerPerformanceTests : IClassFixture<WebApplicationFacto
     {
         // Arrange
         var stopwatch = Stopwatch.StartNew();
-        
+
         // Act - Request 500 items
         var response = await _client.GetAsync("/api/stock?pageSize=500");
         stopwatch.Stop();
-        
+
         // Assert
         response.EnsureSuccessStatusCode();
         // Should complete within 5 seconds even for large page
@@ -107,19 +107,19 @@ public class StockControllerPerformanceTests : IClassFixture<WebApplicationFacto
     {
         // Make multiple requests and verify total count is consistent
         var totalCounts = new List<int>();
-        
+
         for (int i = 1; i <= 5; i++)
         {
             var response = await _client.GetAsync($"/api/stock?pageSize=10&pageNumber={i}");
             response.EnsureSuccessStatusCode();
-            
+
             var content = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<PaginatedResponseDto<StockItemDto>>(content,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            
+
             totalCounts.Add(result!.TotalCount);
         }
-        
+
         // All requests should report the same total count
         totalCounts.Should().AllBeEquivalentTo(totalCounts.First());
     }
@@ -129,11 +129,11 @@ public class StockControllerPerformanceTests : IClassFixture<WebApplicationFacto
     {
         // Arrange
         var stopwatch = Stopwatch.StartNew();
-        
+
         // Act
         var response = await _client.GetAsync("/api/stock/search?barcode=123");
         stopwatch.Stop();
-        
+
         // Assert
         response.EnsureSuccessStatusCode();
         // Search should complete within 2 seconds
@@ -149,16 +149,16 @@ public class StockControllerPerformanceTests : IClassFixture<WebApplicationFacto
         var listContent = await listResponse.Content.ReadAsStringAsync();
         var listResult = JsonSerializer.Deserialize<PaginatedResponseDto<StockItemDto>>(listContent,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        
+
         if (listResult?.Items?.Any() == true)
         {
             var code = listResult.Items.First().Code;
-            
+
             // Measure single item retrieval
             var stopwatch = Stopwatch.StartNew();
             var response = await _client.GetAsync($"/api/stock/{code}");
             stopwatch.Stop();
-            
+
             response.EnsureSuccessStatusCode();
             // Single item should be retrieved within 1 second
             stopwatch.ElapsedMilliseconds.Should().BeLessThan(1000);
@@ -171,18 +171,18 @@ public class StockControllerPerformanceTests : IClassFixture<WebApplicationFacto
         // Get first two pages
         var response1 = await _client.GetAsync("/api/stock?pageSize=5&pageNumber=1");
         var response2 = await _client.GetAsync("/api/stock?pageSize=5&pageNumber=2");
-        
+
         response1.EnsureSuccessStatusCode();
         response2.EnsureSuccessStatusCode();
-        
+
         var content1 = await response1.Content.ReadAsStringAsync();
         var content2 = await response2.Content.ReadAsStringAsync();
-        
+
         var result1 = JsonSerializer.Deserialize<PaginatedResponseDto<StockItemDto>>(content1,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         var result2 = JsonSerializer.Deserialize<PaginatedResponseDto<StockItemDto>>(content2,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        
+
         // Verify pagination metadata
         result1!.PageNumber.Should().Be(1);
         result2!.PageNumber.Should().Be(2);
@@ -195,7 +195,7 @@ public class StockControllerPerformanceTests : IClassFixture<WebApplicationFacto
         {
             result2.HasPreviousPage.Should().BeTrue();
         }
-        
+
         // Items should be different between pages
         if (result1.Items.Any() && result2.Items.Any())
         {

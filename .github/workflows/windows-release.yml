@@ -12,10 +12,10 @@ jobs:
     runs-on: windows-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
     
@@ -73,8 +73,12 @@ jobs:
         # Create Releases directory
         New-Item -ItemType Directory -Force -Path ./Releases
         
-        # Run Squirrel to create installer
-        squirrel --releasify "./nupkg/DbcServer.$version.nupkg" --releaseDir ./Releases --setupIcon ./icon.ico --no-msi
+        # Run Squirrel to create installer (skip icon if not exists)
+        if (Test-Path "./icon.ico") {
+          squirrel --releasify "./nupkg/DbcServer.$version.nupkg" --releaseDir ./Releases --setupIcon ./icon.ico --no-msi
+        } else {
+          squirrel --releasify "./nupkg/DbcServer.$version.nupkg" --releaseDir ./Releases --no-msi
+        }
     
     - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
@@ -103,7 +107,7 @@ jobs:
     
     - name: Upload artifacts
       if: "!startsWith(github.ref, 'refs/tags/')"
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: windows-installer
         path: |

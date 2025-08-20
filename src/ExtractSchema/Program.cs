@@ -13,30 +13,30 @@ namespace ExtractSchema
             // Expand wildcards and collect all DBF files
             var dbfFiles = new List<string>();
             string outputPath = "config/schema.sql";
-            
+
             // Default to tmp/*.DBF if no arguments provided
             if (args.Length == 0)
             {
                 args = new[] { "tmp/*.DBF" };
                 Console.WriteLine("Using default: tmp/*.DBF");
             }
-            
+
             foreach (var arg in args)
             {
                 // Check if it's the output file (doesn't end with .DBF)
-                if (!arg.EndsWith(".DBF", StringComparison.OrdinalIgnoreCase) && 
+                if (!arg.EndsWith(".DBF", StringComparison.OrdinalIgnoreCase) &&
                     !arg.Contains("*") && !arg.Contains("?"))
                 {
                     outputPath = arg;
                     continue;
                 }
-                
+
                 // Handle wildcards
                 if (arg.Contains("*") || arg.Contains("?"))
                 {
                     string directory = Path.GetDirectoryName(arg) ?? ".";
                     string pattern = Path.GetFileName(arg);
-                    
+
                     if (Directory.Exists(directory))
                     {
                         var files = Directory.GetFiles(directory, pattern);
@@ -70,7 +70,7 @@ namespace ExtractSchema
                 foreach (var dbfPath in dbfFiles.OrderBy(f => f))
                 {
                     Console.WriteLine($"\nProcessing: {dbfPath}");
-                    
+
                     var header = ReadDbfHeader(dbfPath);
                     string tableName = Path.GetFileNameWithoutExtension(dbfPath).ToUpper();
 
@@ -135,7 +135,7 @@ namespace ExtractSchema
 
                 byte[] nameBytes = reader.ReadBytes(11);
                 int nullIndex = Array.FindIndex(nameBytes, b => b == 0);
-                string name = nullIndex >= 0 
+                string name = nullIndex >= 0
                     ? Encoding.ASCII.GetString(nameBytes, 0, nullIndex)
                     : Encoding.ASCII.GetString(nameBytes).TrimEnd('\0');
 

@@ -23,20 +23,20 @@ public class StockServiceTests
         // Arrange
         var mockItems = new List<StockItem>
         {
-            new StockItem 
-            { 
-                Code = 1, 
-                Name = "Item 1", 
+            new StockItem
+            {
+                Code = 1,
+                Name = "Item 1",
                 Barcode = "123456",
                 Price = 10.50m,
                 Quantity = 100,
                 Category = "Electronics",
                 Unit = "pcs"
             },
-            new StockItem 
-            { 
-                Code = 2, 
-                Name = "Item 2", 
+            new StockItem
+            {
+                Code = 2,
+                Name = "Item 2",
                 Barcode = "789012",
                 Price = 25.00m,
                 Quantity = 50,
@@ -77,9 +77,9 @@ public class StockServiceTests
     public async Task GetStockItemsAsync_WithPagination_ShouldCalculateCorrectPages()
     {
         // Arrange
-        var mockItems = Enumerable.Range(1, 5).Select(i => new StockItem 
-        { 
-            Code = i, 
+        var mockItems = Enumerable.Range(1, 5).Select(i => new StockItem
+        {
+            Code = i,
             Name = $"Item {i}",
             Barcode = $"BC{i:000}",
             Price = i * 10m
@@ -116,10 +116,10 @@ public class StockServiceTests
         var barcode = "123";
         var mockItems = new List<StockItem>
         {
-            new StockItem 
-            { 
-                Code = 1, 
-                Name = "Filtered Item", 
+            new StockItem
+            {
+                Code = 1,
+                Name = "Filtered Item",
                 Barcode = "123456"
             }
         };
@@ -233,18 +233,18 @@ public class StockServiceTests
         var barcode = "ABC";
         var mockItems = new List<StockItem>
         {
-            new StockItem 
-            { 
-                Code = 1, 
-                Name = "Item ABC", 
+            new StockItem
+            {
+                Code = 1,
+                Name = "Item ABC",
                 Barcode = "ABC123",
                 Category = "Category A",
                 Notes = "Test notes 1"
             },
-            new StockItem 
-            { 
-                Code = 2, 
-                Name = "Item 2 ABC", 
+            new StockItem
+            {
+                Code = 2,
+                Name = "Item 2 ABC",
                 Barcode = "456ABC",
                 Category = "Category B",
                 Notes = "Test notes 2"

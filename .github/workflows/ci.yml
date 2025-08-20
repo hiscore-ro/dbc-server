@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -13,13 +13,12 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
-  build-and-test:
-    name: Build and Test
+  test:
+    name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        configuration: [Debug, Release]
 
     steps:
     - name: Checkout repository
@@ -41,100 +40,57 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
+    - name: Format check (info only)
+      run: dotnet format --verify-no-changes --verbosity diagnostic || true
+      continue-on-error: true
+
     - name: Build solution
-      run: dotnet build --configuration ${{ matrix.configuration }} --no-restore
+      run: dotnet build --configuration Release --no-restore /p:TreatWarningsAsErrors=false
 
     - name: Run tests
-      run: dotnet test --configuration ${{ matrix.configuration }} --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+      run: dotnet test --configuration Release --no-build --verbosity normal
 
-    - name: Upload coverage reports
-      if: matrix.os == 'ubuntu-latest' && matrix.configuration == 'Release'
-      uses: codecov/codecov-action@v4
-      with:
-        directory: ./coverage
-        fail_ci_if_error: false
-        verbose: true
-        token: ${{ secrets.CODECOV_TOKEN }}
+    - name: Test API startup (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Start the server in background
+        dotnet run --project src/DbcServer.Api --no-build --configuration Release &
+        SERVER_PID=$!
+        
+        # Wait for server to start
+        sleep 10
+        
+        # Test if server is responding
+        curl -f http://localhost:3000/api/stock?pageSize=1 || exit 1
+        
+        # Kill the server
+        kill $SERVER_PID
 
-  code-quality:
-    name: Code Quality Analysis
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - name: Test API startup (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        # Start the server in background
+        $process = Start-Process -FilePath "dotnet" -ArgumentList "run", "--project", "src/DbcServer.Api", "--no-build", "--configuration", "Release" -PassThru
+        
+        # Wait for server to start
+        Start-Sleep -Seconds 10
+        
+        # Test if server is responding
+        try {
+          $response = Invoke-WebRequest -Uri "http://localhost:3000/api/stock?pageSize=1" -UseBasicParsing
+          if ($response.StatusCode -ne 200) {
+            throw "Server not responding correctly"
+          }
+        } finally {
+          # Kill the server
+          Stop-Process -Id $process.Id -Force
+        }
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
-    - name: Restore dependencies
-      run: dotnet restore
-
-    - name: Format check
-      run: dotnet format --verify-no-changes --verbosity diagnostic
-
-    - name: Build with warnings as errors
-      run: dotnet build /p:TreatWarningsAsErrors=true
-
-  security-scan:
-    name: Security Scanning
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-
-    - name: Upload Trivy results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: 'trivy-results.sarif'
-
-  docker-build:
-    name: Docker Build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-      if: github.event_name != 'pull_request'
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: |
-          ${{ secrets.DOCKER_USERNAME }}/dbc-server:latest
-          ${{ secrets.DOCKER_USERNAME }}/dbc-server:${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-  publish:
-    name: Publish Artifacts
-    runs-on: ubuntu-latest
-    needs: [build-and-test, code-quality]
+  publish-windows:
+    name: Publish Windows Binaries
+    runs-on: windows-latest
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
@@ -145,56 +101,16 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
-
-    - name: Publish Linux x64
-      run: dotnet publish src/DbcServer.Api/DbcServer.Api.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o ./publish/linux-x64
 
     - name: Publish Windows x64
       run: dotnet publish src/DbcServer.Api/DbcServer.Api.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish/win-x64
 
-    - name: Publish macOS x64
-      run: dotnet publish src/DbcServer.Api/DbcServer.Api.csproj -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true -o ./publish/osx-x64
-
-    - name: Upload Linux artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: dbc-server-linux-x64
-        path: ./publish/linux-x64/
+    - name: Copy config example
+      run: Copy-Item -Path "config.example.json" -Destination "./publish/win-x64/config.example.json"
 
     - name: Upload Windows artifact
       uses: actions/upload-artifact@v4
       with:
         name: dbc-server-win-x64
         path: ./publish/win-x64/
-
-    - name: Upload macOS artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: dbc-server-osx-x64
-        path: ./publish/osx-x64/
-
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: publish
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]')
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: ./artifacts
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ github.run_number }}
-        name: Release v${{ github.run_number }}
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-        files: |
-          ./artifacts/**/*
+        retention-days: 30

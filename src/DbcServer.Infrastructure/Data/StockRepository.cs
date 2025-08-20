@@ -20,13 +20,13 @@ public class StockRepository : IStockRepository
     public StockRepository(IConfiguration configuration)
     {
         _dbfPath = configuration["DbfPath"] ?? Path.Combine(Directory.GetCurrentDirectory(), "tmp");
-        
+
         // Resolve relative paths to absolute paths
         if (!Path.IsPathRooted(_dbfPath))
         {
             _dbfPath = Path.Combine(Directory.GetCurrentDirectory(), _dbfPath);
         }
-        
+
         // Log the resolved path for debugging
         Console.WriteLine($"[StockRepository] DBF Path: {_dbfPath}");
         var stocPath = Path.Combine(_dbfPath, "STOC.DBF");
@@ -53,7 +53,7 @@ public class StockRepository : IStockRepository
 
             // Register the code page provider to support Windows-1252 encoding
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            
+
             var options = new DbfDataReaderOptions
             {
                 SkipDeletedRecords = true,
@@ -62,7 +62,7 @@ public class StockRepository : IStockRepository
 
             var items = new List<StockItem>();
             int totalCount = 0;
-            
+
             // If searching by barcode, we need to filter and count
             if (!string.IsNullOrWhiteSpace(barcode))
             {
@@ -72,14 +72,14 @@ public class StockRepository : IStockRepository
                     int currentIndex = 0;
                     int skipCount = (pageNumber - 1) * pageSize;
                     int itemsAdded = 0;
-                    
+
                     while (dbfReader.Read())
                     {
                         var codBare = GetStringSafe(dbfReader, ordinals, "COD_BARE");
                         if (codBare != null && codBare.Contains(barcode, StringComparison.OrdinalIgnoreCase))
                         {
                             totalCount++;
-                            
+
                             // Only map items for the current page
                             if (currentIndex >= skipCount && itemsAdded < pageSize)
                             {
@@ -95,7 +95,7 @@ public class StockRepository : IStockRepository
             {
                 // For unfiltered queries, use cached total count
                 totalCount = GetCachedTotalCount(dbfFilePath);
-                
+
                 // Now read only the records we need for the current page
                 using (var dbfReader = new DbfDataReader.DbfDataReader(dbfFilePath, options))
                 {
@@ -103,13 +103,13 @@ public class StockRepository : IStockRepository
                     int skipCount = (pageNumber - 1) * pageSize;
                     int currentIndex = 0;
                     int itemsAdded = 0;
-                    
+
                     // Skip records until we reach the desired page
                     while (dbfReader.Read() && currentIndex < skipCount)
                     {
                         currentIndex++;
                     }
-                    
+
                     // Read records for the current page
                     while (dbfReader.Read() && itemsAdded < pageSize)
                     {
@@ -140,7 +140,7 @@ public class StockRepository : IStockRepository
 
             // Register the code page provider to support Windows-1252 encoding
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            
+
             var options = new DbfDataReaderOptions
             {
                 SkipDeletedRecords = true,
@@ -149,7 +149,7 @@ public class StockRepository : IStockRepository
 
             using var dbfReader = new DbfDataReader.DbfDataReader(dbfFilePath, options);
             var ordinals = GetOrCacheOrdinals(dbfReader, dbfFilePath);
-            
+
             // For large files, stop as soon as we find the item
             while (dbfReader.Read())
             {
@@ -176,7 +176,7 @@ public class StockRepository : IStockRepository
 
             // Register the code page provider to support Windows-1252 encoding
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            
+
             var options = new DbfDataReaderOptions
             {
                 SkipDeletedRecords = true,
@@ -185,15 +185,15 @@ public class StockRepository : IStockRepository
 
             using var dbfReader = new DbfDataReader.DbfDataReader(dbfFilePath, options);
             var ordinals = GetOrCacheOrdinals(dbfReader, dbfFilePath);
-            
+
             // Limit results to prevent memory issues with large datasets
             const int maxResults = 100;
             int foundCount = 0;
-            
+
             while (dbfReader.Read() && foundCount < maxResults)
             {
                 var codBare = GetStringSafe(dbfReader, ordinals, "COD_BARE");
-                if (!string.IsNullOrWhiteSpace(codBare) && 
+                if (!string.IsNullOrWhiteSpace(codBare) &&
                     codBare.Contains(barcode, StringComparison.OrdinalIgnoreCase))
                 {
                     items.Add(MapToStockItem(dbfReader, ordinals));
@@ -216,7 +216,7 @@ public class StockRepository : IStockRepository
 
             // Register the code page provider to support Windows-1252 encoding
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            
+
             var options = new DbfDataReaderOptions
             {
                 SkipDeletedRecords = true,
@@ -224,7 +224,7 @@ public class StockRepository : IStockRepository
             };
 
             using var dbfReader = new DbfDataReader.DbfDataReader(dbfFilePath, options);
-            
+
             // For unfiltered count, we need to count all records
             if (string.IsNullOrWhiteSpace(barcode))
             {
@@ -235,15 +235,15 @@ public class StockRepository : IStockRepository
                 }
                 return count;
             }
-            
+
             // For filtered count, we need to iterate
             var ordinals = GetOrCacheOrdinals(dbfReader, dbfFilePath);
             int filteredCount = 0;
-            
+
             while (dbfReader.Read())
             {
                 var codBare = GetStringSafe(dbfReader, ordinals, "COD_BARE");
-                if (!string.IsNullOrWhiteSpace(codBare) && 
+                if (!string.IsNullOrWhiteSpace(codBare) &&
                     codBare.Contains(barcode, StringComparison.OrdinalIgnoreCase))
                 {
                     filteredCount++;
@@ -259,7 +259,7 @@ public class StockRepository : IStockRepository
         return _ordinalCache.GetOrAdd(filePath, _ =>
         {
             var ordinals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            
+
             // Cache all column ordinals
             var columnNames = new[]
             {
@@ -303,7 +303,7 @@ public class StockRepository : IStockRepository
             Unit = GetStringSafe(reader, ordinals, "UNIT_MAS"),
             Warehouse = GetInt32Safe(reader, ordinals, "DEPOZITUL")
         };
-        
+
         // Load additional fields only when requested (e.g., for single item queries)
         if (loadAllFields)
         {
@@ -338,7 +338,7 @@ public class StockRepository : IStockRepository
             item.CpvCode = GetStringSafe(reader, ordinals, "CODCPV");
             item.NetWeight = GetDecimalSafe(reader, ordinals, "KILO_NET");
         }
-        
+
         return item;
     }
 
@@ -348,10 +348,10 @@ public class StockRepository : IStockRepository
         {
             if (!ordinals.TryGetValue(fieldName, out var ordinal) || ordinal < 0)
                 return null;
-            
-            if (reader.IsDBNull(ordinal)) 
+
+            if (reader.IsDBNull(ordinal))
                 return null;
-                
+
             return reader.GetString(ordinal)?.Trim();
         }
         catch
@@ -366,10 +366,10 @@ public class StockRepository : IStockRepository
         {
             if (!ordinals.TryGetValue(fieldName, out var ordinal) || ordinal < 0)
                 return 0;
-                
-            if (reader.IsDBNull(ordinal)) 
+
+            if (reader.IsDBNull(ordinal))
                 return 0;
-                
+
             // Try direct int32 conversion first
             try
             {
@@ -380,14 +380,14 @@ public class StockRepository : IStockRepository
                 // Fall back to generic value conversion
                 var value = reader.GetValue(ordinal);
                 if (value == null) return 0;
-                
+
                 var stringValue = value.ToString();
                 if (string.IsNullOrWhiteSpace(stringValue)) return 0;
-                
+
                 // Try parsing as decimal first (handles decimal values)
                 if (decimal.TryParse(stringValue, out decimal decimalResult))
                     return (int)decimalResult;
-                
+
                 return 0;
             }
         }
@@ -403,10 +403,10 @@ public class StockRepository : IStockRepository
         {
             if (!ordinals.TryGetValue(fieldName, out var ordinal) || ordinal < 0)
                 return 0m;
-                
-            if (reader.IsDBNull(ordinal)) 
+
+            if (reader.IsDBNull(ordinal))
                 return 0m;
-                
+
             // Try direct decimal conversion first
             try
             {
@@ -417,13 +417,13 @@ public class StockRepository : IStockRepository
                 // Fall back to generic value conversion
                 var value = reader.GetValue(ordinal);
                 if (value == null) return 0m;
-                
+
                 var stringValue = value.ToString();
                 if (string.IsNullOrWhiteSpace(stringValue)) return 0m;
-                
+
                 if (decimal.TryParse(stringValue, out decimal result))
                     return result;
-                
+
                 return 0m;
             }
         }
@@ -439,10 +439,10 @@ public class StockRepository : IStockRepository
         {
             if (!ordinals.TryGetValue(fieldName, out var ordinal) || ordinal < 0)
                 return false;
-                
-            if (reader.IsDBNull(ordinal)) 
+
+            if (reader.IsDBNull(ordinal))
                 return false;
-                
+
             // Try direct boolean conversion first
             try
             {
@@ -453,9 +453,9 @@ public class StockRepository : IStockRepository
                 // Fall back to generic value conversion
                 var value = reader.GetValue(ordinal);
                 if (value == null) return false;
-                
+
                 var stringValue = value.ToString()?.ToUpperInvariant();
-                return stringValue == "T" || stringValue == "TRUE" || stringValue == "1" || 
+                return stringValue == "T" || stringValue == "TRUE" || stringValue == "1" ||
                        stringValue == "Y" || stringValue == "YES" || stringValue == "DA";
             }
         }
@@ -471,10 +471,10 @@ public class StockRepository : IStockRepository
         {
             if (!ordinals.TryGetValue(fieldName, out var ordinal) || ordinal < 0)
                 return null;
-                
-            if (reader.IsDBNull(ordinal)) 
+
+            if (reader.IsDBNull(ordinal))
                 return null;
-                
+
             // Try direct DateTime conversion first
             try
             {
@@ -485,13 +485,13 @@ public class StockRepository : IStockRepository
                 // Fall back to generic value conversion
                 var value = reader.GetValue(ordinal);
                 if (value == null) return null;
-                
+
                 var stringValue = value.ToString();
                 if (string.IsNullOrWhiteSpace(stringValue)) return null;
-                
+
                 if (DateTime.TryParse(stringValue, out DateTime result))
                     return result;
-                
+
                 return null;
             }
         }
@@ -500,7 +500,7 @@ public class StockRepository : IStockRepository
             return null;
         }
     }
-    
+
     private int GetCachedTotalCount(string dbfFilePath)
     {
         lock (_cacheLock)
@@ -509,19 +509,19 @@ public class StockRepository : IStockRepository
             if (_cachedTotalCount.HasValue && DateTime.Now < _cacheExpiryTime)
             {
                 // If cache is about to expire (within 2 minutes), refresh in background
-                if (DateTime.Now.Add(TimeSpan.FromMinutes(2)) > _cacheExpiryTime && 
+                if (DateTime.Now.Add(TimeSpan.FromMinutes(2)) > _cacheExpiryTime &&
                     (_backgroundCacheTask == null || _backgroundCacheTask.IsCompleted))
                 {
                     _backgroundCacheTask = Task.Run(() => RefreshCacheInBackground(dbfFilePath));
                 }
                 return _cachedTotalCount.Value;
             }
-            
+
             // Cache expired or doesn't exist, need to recalculate
             return RefreshCacheSync(dbfFilePath);
         }
     }
-    
+
     private int RefreshCacheSync(string dbfFilePath)
     {
         // Count records efficiently
@@ -530,23 +530,23 @@ public class StockRepository : IStockRepository
             SkipDeletedRecords = true,
             Encoding = Encoding.GetEncoding(1252)
         };
-        
+
         using var dbfReader = new DbfDataReader.DbfDataReader(dbfFilePath, options);
         int count = 0;
         while (dbfReader.Read())
         {
             count++;
         }
-        
+
         lock (_cacheLock)
         {
             _cachedTotalCount = count;
             _cacheExpiryTime = DateTime.Now.Add(_cacheDuration);
         }
-        
+
         return count;
     }
-    
+
     private void RefreshCacheInBackground(string dbfFilePath)
     {
         try
@@ -557,14 +557,14 @@ public class StockRepository : IStockRepository
                 SkipDeletedRecords = true,
                 Encoding = Encoding.GetEncoding(1252)
             };
-            
+
             using var dbfReader = new DbfDataReader.DbfDataReader(dbfFilePath, options);
             int count = 0;
             while (dbfReader.Read())
             {
                 count++;
             }
-            
+
             lock (_cacheLock)
             {
                 _cachedTotalCount = count;

@@ -25,7 +25,7 @@ public class StockControllerTests : IClassFixture<CustomWebApplicationFactory<Pr
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
+
         var content = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<StockItemDto>>();
         content.Should().NotBeNull();
         content!.PageNumber.Should().Be(1);
@@ -41,7 +41,7 @@ public class StockControllerTests : IClassFixture<CustomWebApplicationFactory<Pr
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
+
         var content = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<StockItemDto>>();
         content.Should().NotBeNull();
         content!.Items.Should().NotBeNull();
@@ -55,7 +55,7 @@ public class StockControllerTests : IClassFixture<CustomWebApplicationFactory<Pr
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
+
         var content = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<StockItemDto>>();
         content.Should().NotBeNull();
         content!.PageNumber.Should().Be(1);
@@ -69,7 +69,7 @@ public class StockControllerTests : IClassFixture<CustomWebApplicationFactory<Pr
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
+
         var content = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<StockItemDto>>();
         content.Should().NotBeNull();
         content!.PageSize.Should().Be(100);
@@ -113,7 +113,7 @@ public class StockControllerTests : IClassFixture<CustomWebApplicationFactory<Pr
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        
+
         var content = await response.Content.ReadFromJsonAsync<IEnumerable<StockItemDto>>();
         content.Should().NotBeNull();
     }

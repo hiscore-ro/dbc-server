@@ -32,7 +32,7 @@ public class StockController : ControllerBase
     public async Task<IActionResult> GetStockItemByCode(int code)
     {
         var item = await _stockService.GetStockItemByCodeAsync(code);
-        
+
         if (item == null)
             return NotFound(new { message = $"Stock item with code {code} not found" });
 

@@ -41,13 +41,13 @@ public class UpdateService : IHostedService, IDisposable
 #if WINDOWS
             _updateManager = await UpdateManager.GitHubUpdateManager(_config.UpdateSettings.UpdateUrl);
 #endif
-            
+
             // Check for updates immediately on startup
             await CheckForUpdates();
-            
+
             // Set up timer to check for updates periodically
             var checkInterval = TimeSpan.FromMinutes(_config.UpdateSettings.CheckIntervalMinutes);
-            _timer = new Timer(async _ => await CheckForUpdates(), null, 
+            _timer = new Timer(async _ => await CheckForUpdates(), null,
                 checkInterval, checkInterval);
         }
         catch (Exception ex)
