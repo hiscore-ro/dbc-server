@@ -1,4 +1,6 @@
+#if WINDOWS
 using Squirrel;
+#endif
 using DbcServer.Core.Configuration;
 
 namespace DbcServer.Api.Services;
@@ -8,7 +10,11 @@ public class UpdateService : IHostedService, IDisposable
     private readonly AppConfiguration _config;
     private readonly ILogger<UpdateService> _logger;
     private Timer? _timer;
+#if WINDOWS
     private UpdateManager? _updateManager;
+#else
+    private object? _updateManager;
+#endif
 
     public UpdateService(AppConfiguration config, ILogger<UpdateService> logger)
     {
@@ -32,7 +38,9 @@ public class UpdateService : IHostedService, IDisposable
 
         try
         {
+#if WINDOWS
             _updateManager = await UpdateManager.GitHubUpdateManager(_config.UpdateSettings.UpdateUrl);
+#endif
             
             // Check for updates immediately on startup
             await CheckForUpdates();
@@ -50,6 +58,7 @@ public class UpdateService : IHostedService, IDisposable
 
     private async Task CheckForUpdates()
     {
+#if WINDOWS
         if (_updateManager == null) return;
 
         try
@@ -76,6 +85,10 @@ public class UpdateService : IHostedService, IDisposable
         {
             _logger.LogError(ex, "Error checking for updates");
         }
+#else
+        await Task.CompletedTask;
+        _logger.LogInformation("Auto-update is only available on Windows");
+#endif
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
@@ -87,6 +100,8 @@ public class UpdateService : IHostedService, IDisposable
     public void Dispose()
     {
         _timer?.Dispose();
+#if WINDOWS
         _updateManager?.Dispose();
+#endif
     }
 }

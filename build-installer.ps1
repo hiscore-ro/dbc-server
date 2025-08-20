@@ -52,10 +52,10 @@ $nuspecContent = @"
     <id>DbcServer</id>
     <version>$Version</version>
     <title>DBC Server</title>
-    <authors>Your Name</authors>
+    <authors>Vasile Buza</authors>
     <description>Cross-platform DBF file API server with Windows auto-update support</description>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <iconUrl>https://raw.githubusercontent.com/yourusername/dbc-server/main/icon.png</iconUrl>
+    <iconUrl>https://raw.githubusercontent.com/hiscore-ro/dbc-server/main/icon.png</iconUrl>
   </metadata>
   <files>
     <file src="publish\**\*.*" target="lib\net45\" />

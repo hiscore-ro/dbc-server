@@ -52,7 +52,7 @@ jobs:
           <metadata>
             <id>DbcServer</id>
             <version>$version</version>
-            <authors>Your Name</authors>
+            <authors>Vasile Buza</authors>
             <description>DBC Server - DBF file API server</description>
             <requireLicenseAcceptance>false</requireLicenseAcceptance>
           </metadata>

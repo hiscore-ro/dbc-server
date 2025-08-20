@@ -7,6 +7,6 @@
   "updateSettings": {
     "enableAutoUpdate": true,
     "checkIntervalMinutes": 60,
-    "updateUrl": "https://github.com/yourusername/dbc-server"
+    "updateUrl": "https://github.com/hiscore-ro/dbc-server"
   }
 }

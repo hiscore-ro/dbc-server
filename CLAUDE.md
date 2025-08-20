@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-dbc-server is a cross-platform C# server that exposes dBase database (.DBF) files through a RESTful API. The server works on both Linux and Windows, providing read access to dBase data files stored in the `tmp` directory. The server successfully handles large DBF files (100+ MB with 200,000+ records) with efficient pagination and cached column ordinals for performance.
+dbc-server is a high-performance, cross-platform C# server that exposes dBase database (.DBF) files through a RESTful API with Windows installer and auto-update support. The server works on both Linux and Windows, providing read access to dBase data files. It successfully handles large DBF files (100+ MB with 239,000+ records) with multiple layers of caching, efficient pagination, and background cache refresh for optimal performance.
 
 ## Project Structure
 
@@ -12,13 +12,20 @@ dbc-server is a cross-platform C# server that exposes dBase database (.DBF) file
 dbc-server/
 ├── src/
 │   ├── DbcServer.Api/           # ASP.NET Core Web API project
+│   │   └── Services/            # Background services (UpdateService)
 │   ├── DbcServer.Core/          # Core business logic and domain models
+│   │   └── Configuration/       # AppConfiguration model
 │   ├── DbcServer.Infrastructure/ # Data access, dBase file reading
+│   │   └── Configuration/       # ConfigurationService
 │   └── DbcServer.Application/   # Application services and DTOs
 ├── tests/
 │   ├── DbcServer.UnitTests/     # Unit tests
 │   └── DbcServer.IntegrationTests/ # Integration tests
 ├── tmp/                          # dBase database files (.DBF, .MDX)
+├── .github/workflows/            # CI/CD pipelines
+│   └── windows-release.yml      # Windows installer build & release
+├── build-installer.ps1           # Local Windows installer build script
+├── config.example.json           # Configuration template
 └── DbcServer.sln                 # Solution file
 ```
 
@@ -175,6 +182,9 @@ dotnet list package --outdated
 <PackageReference Include="DbfDataReader" Version="0.5.11" />
 <PackageReference Include="System.Text.Encoding.CodePages" Version="9.0.8" />
 
+<!-- For Windows installer and auto-updates -->
+<PackageReference Include="Squirrel.Windows" Version="2.0.1" />
+
 <!-- For environment variables -->
 <PackageReference Include="DotNetEnv" Version="3.1.1" />
 
@@ -256,19 +266,38 @@ Ensure the application has read permissions for this directory on both Windows a
 
 ## Configuration
 
-### Environment Variables (.env file)
+### Windows Production (config.json)
+The server creates `config.json` from `config.example.json` on first run:
+```json
+{
+  "dbfPath": "C:\\path\\to\\dbf\\files",
+  "serverUrl": "http://localhost:3000",
+  "environment": "Production",
+  "cacheTtlMinutes": 15,
+  "maxSearchResults": 100,
+  "updateSettings": {
+    "enableAutoUpdate": true,
+    "checkIntervalMinutes": 60,
+    "updateUrl": "https://github.com/hiscore-ro/dbc-server"
+  }
+}
+```
+
+### Linux/Development (.env file)
 ```bash
 DBF_PATH=tmp                              # Path to DBF files
 ASPNETCORE_URLS=http://localhost:3000    # Server URL
 ASPNETCORE_ENVIRONMENT=Development       # Environment
 ```
 
-### appsettings.json
+### appsettings.json (Optional)
 ```json
 {
   "DbfPath": "../../tmp"  // Relative path from Api project
 }
 ```
+
+Configuration priority: Environment Variables > config.json > appsettings.json
 
 ## Performance Optimizations
 

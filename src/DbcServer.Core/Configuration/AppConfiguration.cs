@@ -14,5 +14,5 @@ public class UpdateSettings
 {
     public bool EnableAutoUpdate { get; set; } = true;
     public int CheckIntervalMinutes { get; set; } = 60;
-    public string UpdateUrl { get; set; } = "https://github.com/yourusername/dbc-server";
+    public string UpdateUrl { get; set; } = "https://github.com/hiscore-ro/dbc-server";
 }

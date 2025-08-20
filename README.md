@@ -1,6 +1,6 @@
 # DBC Server
 
-A cross-platform REST API server for accessing dBase (.DBF) database files.
+A high-performance, cross-platform server that exposes dBase (.DBF) files through a RESTful API with Windows installer and auto-update support.
 
 ## Overview
 
@@ -8,41 +8,42 @@ DBC Server provides a high-performance RESTful API interface to read and query d
 
 ## Features
 
-- Cross-platform support (Linux, Windows, macOS)
-- RESTful API with OpenAPI/Swagger documentation
-- Read-only access to dBase (.DBF) files with pagination
-- Efficient handling of large datasets (100+ MB files)
-- English JSON responses with automatic field name translation
-- Barcode-based searching with optimized filtering
-- Support for index files (.MDX, .CDX, .NTX)
-- Clean architecture with SOLID principles
-- Comprehensive test coverage (23 tests passing)
-- Docker support
-- Schema extraction tool for DBF files
-- Environment variable configuration (.env support)
+- 🚀 **High Performance**: Optimized for large DBF files (100+ MB, 200,000+ records) with smart caching
+- 🔄 **Auto-Updates**: Automatic updates on Windows via Squirrel.Windows  
+- 📦 **Easy Installation**: Windows installer with simple configuration via config.json
+- ⚡ **Smart Caching**: 15-minute TTL cache with background refresh for instant responses
+- 🌐 **Cross-Platform**: Runs on Windows, Linux, and macOS
+- 🔧 **Flexible Configuration**: Support for config.json (Windows) and environment variables (Linux/Dev)
+- 📄 **Pagination**: Efficient pagination for large datasets
+- 🔍 **Search**: Fast barcode-based search with result limiting
+- 📊 **RESTful API**: Clean REST API with OpenAPI/Swagger documentation
+- 🏗️ **Clean Architecture**: SOLID principles with comprehensive test coverage
+- 🐳 **Docker Support**: Containerized deployment option
+- 🛠️ **Schema Extraction**: Built-in tool for extracting DBF schemas
 
-## Architecture
+## Installation
 
-The project follows Clean Architecture principles with clear separation of concerns:
+### Windows (Recommended)
 
-- **DbcServer.Api** - Web API layer with controllers and middleware
-- **DbcServer.Application** - Business logic and application services
-- **DbcServer.Core** - Domain models and interfaces
-- **DbcServer.Infrastructure** - Data access and external dependencies
-- **ExtractSchema** - Command-line tool for extracting schema from DBF files
+1. Download the latest `Setup.exe` from [Releases](https://github.com/hiscore-ro/dbc-server/releases)
+2. Run the installer - the app will be installed to `%LOCALAPPDATA%\DbcServer`
+3. Edit `config.json` in the installation directory to configure:
+   - Path to your DBF files
+   - Server port and URL
+   - Auto-update settings
+4. The server will auto-update when new versions are available
 
-## Quick Start
+### Manual Installation (Development)
 
-### Prerequisites
-
+#### Prerequisites
 - .NET 8.0 SDK or later
 - Git
 
-### Installation
+#### Steps
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/dbc-server.git
+git clone https://github.com/hiscore-ro/dbc-server.git
 cd dbc-server
 ```
 
@@ -65,9 +66,54 @@ dotnet run --project src/DbcServer.Api
 
 The API will be available at `http://localhost:3000` with Swagger documentation at `http://localhost:3000/swagger`.
 
+## Configuration
+
+### Windows (config.json)
+
+After installation, edit `%LOCALAPPDATA%\DbcServer\config.json`:
+
+```json
+{
+  "dbfPath": "C:\\path\\to\\dbf\\files",
+  "serverUrl": "http://localhost:3000",
+  "environment": "Production",
+  "cacheTtlMinutes": 15,
+  "maxSearchResults": 100,
+  "updateSettings": {
+    "enableAutoUpdate": true,
+    "checkIntervalMinutes": 60,
+    "updateUrl": "https://github.com/hiscore-ro/dbc-server"
+  }
+}
+```
+
+### Linux/Development (.env)
+
+Create a `.env` file in the project root:
+
+```bash
+DBF_PATH=tmp                              # Path to DBF files
+ASPNETCORE_URLS=http://localhost:3000    # Server URL
+ASPNETCORE_ENVIRONMENT=Development       # Environment
+```
+
+### appsettings.json (Optional)
+
+```json
+{
+  "DbfPath": "../../tmp",  // Relative path from Api project
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+```
+
 ## API Endpoints
 
-### Stock Endpoints (Implemented)
+### Stock Endpoints
 
 | Method | Endpoint | Description | Query Parameters |
 |--------|----------|-------------|------------------|
@@ -104,12 +150,7 @@ curl "http://localhost:3000/api/stock/search?barcode=ABC123"
       "quantity": 100,
       "price": 29.99,
       "unit": "pcs",
-      "warehouse": 1,
-      "priceB": 0,
-      "priceC": 0,
-      "lot": "",
-      "warranty": null,
-      "notes": ""
+      "warehouse": 1
     }
   ],
   "totalCount": 239618,
@@ -121,6 +162,34 @@ curl "http://localhost:3000/api/stock/search?barcode=ABC123"
 }
 ```
 
+## Performance
+
+The server is optimized for handling large DBF files with multiple caching layers:
+
+### Optimization Techniques
+
+1. **Singleton Repository Pattern**: Repository registered as singleton to enable cross-request caching
+2. **Cached Total Count (15-minute TTL)**: 
+   - Total record count cached for 15 minutes to avoid counting 239k+ records on every request
+   - Background refresh: When cache is within 2 minutes of expiry, a background thread refreshes it
+   - Previous cached value is used while background recalculation happens
+3. **Cached Column Ordinals**: Column ordinals cached per file using ConcurrentDictionary
+4. **Efficient Pagination**: Skips directly to needed page without reading all preceding records
+5. **Selective Field Mapping**: 
+   - List endpoints load only essential fields (8 fields)
+   - Detail endpoints load all fields (38 fields) with `loadAllFields: true`
+6. **Limited Search Results**: Search operations limited to 100 results to prevent memory issues
+
+### Benchmarks
+
+- **Before optimization**: ~1.5-3 seconds per paginated request
+- **After optimization**: 
+  - First request: ~2.8 seconds (includes cache population)
+  - Subsequent requests: ~10-14ms (100-300x faster)
+  - Search endpoint: ~180ms
+- Successfully handles 100+ MB DBF files with 239,619 records
+- Tested with 44 columns per record
+
 ## Data Directory
 
 Place your dBase files in the `tmp/` directory:
@@ -129,8 +198,6 @@ Place your dBase files in the `tmp/` directory:
 - `.CDX` - Compound index files
 - `.FPT` - Memo field files
 - `.NTX` - Single index files
-
-The server successfully handles large DBF files (100+ MB) with efficient pagination and caching.
 
 ## Tools
 
@@ -147,28 +214,7 @@ bin/extract-schema tmp/STOC.DBF tmp/OTHER.DBF
 
 # Extract to custom output file
 bin/extract-schema tmp/STOC.DBF custom-schema.sql
-
-# Extract from different directory
-bin/extract-schema data/*.DBF
 ```
-
-The tool automatically reads DBF headers and MDX index files to generate complete SQL schemas. Default input is `tmp/*.DBF` and default output is `config/schema.sql`.
-
-## Performance
-
-The server is optimized for handling large DBF files:
-
-- **Cached Column Ordinals**: Column lookups are cached using ConcurrentDictionary to avoid repeated scans
-- **Efficient Pagination**: Only requested records are loaded into memory
-- **Limited Search Results**: Search operations return max 100 results to prevent memory issues
-- **Encoding Support**: Uses System.Text.Encoding.CodePages for Windows-1252 encoding (Romanian characters)
-
-### Benchmarks
-
-- Successfully handles 100+ MB DBF files
-- Processes 239,619 records efficiently
-- Sub-second response times for paginated queries
-- Tested with 44 columns per record
 
 ## Development
 
@@ -199,31 +245,29 @@ dotnet build /p:TreatWarningsAsErrors=true
 dotnet list package --outdated
 ```
 
-### Configuration
+## CI/CD
 
-Create a `.env` file in the project root:
+The project includes GitHub Actions workflows for:
 
-```bash
-DBF_PATH=tmp                              # Path to DBF files
-ASPNETCORE_URLS=http://localhost:3000    # Server URL
-ASPNETCORE_ENVIRONMENT=Development       # Environment
+- **Windows Release Pipeline** - Automated Windows installer builds
+  - Triggers on push to `main` or version tags (e.g., `v1.0.0`)
+  - Creates Squirrel.Windows installer with auto-update support
+  - Publishes releases to GitHub automatically
+  - Cleans up old releases (keeps only last 20 versions)
+- **CI/CD Pipeline** - Build, test, and publish on multiple platforms
+- **Dependency Check** - Weekly scan for outdated and vulnerable packages
+- **Security Scanning** - Trivy vulnerability scanning
+
+### Building Windows Installer Locally
+
+```powershell
+# Run the build script
+.\build-installer.ps1 -Version 1.0.0
+
+# The installer will be in ./Releases/Setup.exe
 ```
 
-Configure `appsettings.json`:
-
-```json
-{
-  "DbfPath": "../../tmp",  // Relative path from Api project
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  }
-}
-```
-
-### Docker
+## Docker
 
 Build and run with Docker:
 
@@ -235,14 +279,21 @@ docker build -t dbc-server .
 docker run -d -p 3000:80 -v $(pwd)/tmp:/app/tmp dbc-server
 ```
 
-## CI/CD
+## Project Structure
 
-The project includes GitHub Actions workflows for:
-
-- **CI/CD Pipeline** - Build, test, and publish on multiple platforms
-- **Dependency Check** - Weekly scan for outdated and vulnerable packages
-- **Security Scanning** - Trivy vulnerability scanning
-- **Automated Releases** - Create releases with compiled binaries
+```
+dbc-server/
+├── src/
+│   ├── DbcServer.Api/           # Web API endpoints and middleware
+│   ├── DbcServer.Core/          # Domain models and interfaces
+│   ├── DbcServer.Infrastructure/ # Data access layer (DBF reading)
+│   └── DbcServer.Application/   # Business logic and services
+├── tests/                       # Unit and integration tests
+├── tmp/                         # DBF files directory
+├── .github/workflows/           # CI/CD pipelines
+├── build-installer.ps1          # Local Windows installer build script
+└── config.example.json          # Configuration template
+```
 
 ## Contributing
 
@@ -254,8 +305,12 @@ The project includes GitHub Actions workflows for:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is proprietary software. All rights reserved.
 
 ## Support
 
-For issues, questions, or suggestions, please open an issue on GitHub.
+For issues, questions, or suggestions, please open an issue on [GitHub](https://github.com/hiscore-ro/dbc-server/issues).
+
+## Author
+
+Vasile Buza - vasile@hiscore.ro
