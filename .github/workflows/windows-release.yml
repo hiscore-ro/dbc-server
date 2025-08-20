@@ -43,9 +43,12 @@ jobs:
     - name: Download Squirrel tools
       shell: pwsh
       run: |
-        # Download Squirrel.Windows package
-        Invoke-WebRequest -Uri "https://github.com/Squirrel/Squirrel.Windows/releases/download/2.0.1/Squirrel.Windows-2.0.1.zip" -OutFile "squirrel.zip"
-        Expand-Archive -Path "squirrel.zip" -DestinationPath "./squirrel-tools" -Force
+        # Download Squirrel.Windows NuGet package
+        nuget install Squirrel.Windows -Version 2.0.1 -OutputDirectory ./packages
+        
+        # Copy Squirrel.exe to tools directory
+        New-Item -ItemType Directory -Force -Path ./squirrel-tools
+        Copy-Item -Path "./packages/Squirrel.Windows.2.0.1/tools/*" -Destination "./squirrel-tools/" -Recurse
         
         # Add to PATH
         echo "$PWD\squirrel-tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
