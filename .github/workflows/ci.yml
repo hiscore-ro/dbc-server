@@ -109,7 +109,7 @@ jobs:
       run: Copy-Item -Path "config.example.json" -Destination "./publish/win-x64/config.example.json"
 
     - name: Upload Windows artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: dbc-server-win-x64
         path: ./publish/win-x64/
